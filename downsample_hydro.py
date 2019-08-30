@@ -232,19 +232,20 @@ if __name__ == '__main__':
 
 	#########################################################################################
 	# Create  directions array along stream network
-	# 
-	dir_arr = create_directions(downsample_acc,downsample_ord,max_start_acc=max_start_acc,max_step_acc=max_step_acc)
-
-	# Create outlets array based on directions (use special value of -1 at bottom of river or domain boundary). Setting missing value to 0 allows processing in qgis by 'raster pixels to points'
 	#
-	outlets_arr = dir_arr == -1
-	gdalutils.write_raster(outlets_arr, f_outlets, geo, 'Int16', 0)
+	if not os.path.exists(f_dir): 
+		dir_arr = create_directions(downsample_acc,downsample_ord,max_start_acc=max_start_acc,max_step_acc=max_step_acc)
 
-	# Remove outlets from final outlets_arr, write out to file
-	dir_arr[outlets_arr] = 0
-	gdalutils.write_raster(dir_arr, f_dir, geo, 'Int16', -32767)
+		# Create outlets array based on directions (use special value of -1 at bottom of river or domain boundary). Setting missing value to 0 allows processing in qgis by 'raster pixels to points'
+		#
+		outlets_arr = dir_arr == -1
+		gdalutils.write_raster(outlets_arr, f_outlets, geo, 'Int16', 0)
 
-	# Create network array of points in river network
-	# 
-	net_arr = dir_arr > 0
-	gdalutils.write_raster(net_arr, f_net, geo, 'Int16', -32767)
+		# Remove outlets from final outlets_arr, write out to file
+		dir_arr[outlets_arr] = 0
+		gdalutils.write_raster(dir_arr, f_dir, geo, 'Int16', -32767)
+
+		# Create network array of points in river network
+		# 
+		net_arr = dir_arr > 0
+		gdalutils.write_raster(net_arr, f_net, geo, 'Int16', -32767)
