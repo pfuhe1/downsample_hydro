@@ -1,7 +1,7 @@
 # Python script to process downsampled hydrography from 'downsample_hydro.py
 # Calls streamnet function and creates 'rec'.csv (using jsosa/LFPtools), to describe the river network
-# 
-# Requires: 
+#
+# Requires:
 # mpiexec
 # streamnet from TauDEM (https://github.com/dtarb/TauDEM)
 # split module from LFPtools (https://github.com/jsosa/LFPtools)
@@ -9,14 +9,14 @@
 # Import python modules
 import os,sys,subprocess
 sys.path.append('/home/pu17449/gitsrc/LFPtools/lfptools') # Folder containing split.py
-from split import connections 
+from split import connections
 
 # Paths of executables to run TauDEM
 TauDEM_bindir = '/home/pu17449/gitsrc/TauDEM/bin' # contains streamnet executable
 mpiexec_bindir = '/usr/bin' # contains mpiexec executable
 
 # resolution of downscaled hydrography
-res = '15s'
+res = '30s'
 
 indir = '/home/pu17449/data2/lfp-tools/splitd8_v2/077'
 # input files (produced by 'downsample_hydro.py')

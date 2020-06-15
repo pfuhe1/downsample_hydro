@@ -10,7 +10,43 @@ import numpy as np
 from skimage.measure import block_reduce
 
 ################################################################################################
-# Function to trace down from the upstream of the river network 
+# Function to trace down from the upstream of the river network
+# To the bottom of the network, or to part of the network that has already been processed
+#
+def remove_trib(dirn,j,i):
+	"""
+	Remove upstream section of river until getting to a point which no further upstream points
+	point j,i is the first point to remove, and needs to have its upstream link removed
+	otherwise this function will not remove any points
+	"""
+	dirindex = np.array([[0,0],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1]],dtype=np.int16)
+	reverse_dirn = np.array([-1,5,6,7,8,1,2,3,4],dtype=np.int16)
+	counter = 0
+	while True:
+		#print('removing point j,i,dirn',j,i,dirn)
+			# Remove this cell
+		dirn[j,i] = 0
+		counter += 1
+		# Check if this cell has any upstream points (if not, exit)
+		foundupstream=False
+		# Loop over d8 directions
+		for d in range(1,9):
+			# If the neighbor points to this cell
+			if dirn[j+dirindex[d,0],i+dirindex[d,1]] == reverse_dirn[d]:
+				# Go to next cell
+				nextj = j + dirindex[d,0]
+				nexti = i + dirindex[d,1]
+				foundupstream = True
+		# Exit if no upstream point
+		if not foundupstream:
+			print('Removed trib with size',counter)
+			return dirn
+		else:
+			j = nextj
+			i = nexti
+
+################################################################################################
+# Function to trace down from the upstream of the river network
 # To the bottom of the network, or to part of the network that has already been processed
 #
 def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
@@ -24,7 +60,7 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 
 	# Counter for the number of cells in this tributary
 	counter = 1
-	
+
 	# Loop over cells from upstream to downstream
 	while True:
 		process_mask[j,i] = True # mask this cell so not processed again
@@ -48,7 +84,7 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 					dir_arr[j,i] = -1
 					print('reached bottom of network. len=',counter)
 					return
-			elif min(nextord[possible_items]) == ord_arr[j,i] and min(nextacc[possible_items])< acc_arr[j,i]+max_step_acc: 
+			elif min(nextord[possible_items]) == ord_arr[j,i] and min(nextacc[possible_items])< acc_arr[j,i]+max_step_acc:
 				# Normal case (there is just a small increase in accumulation to the next cell)
 				# mask nextacc by possible items then take the lowest value
 				nextacc = np.ma.masked_where(np.logical_not(possible_items),acc_arr[nextij])
@@ -59,7 +95,7 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 				possible_items = np.logical_and(nextord > ord_arr[j,i] , nextacc > acc_arr[j,i] ) # Try merging with larger river stem
 				if sum(possible_items)==0:
 					# Continue on same stream (assume smaller tributary has merged)
-					possible_items = np.logical_and(nextord==ord_arr[j,i] ,nextacc>acc_arr[j,i]) 
+					possible_items = np.logical_and(nextord==ord_arr[j,i] ,nextacc>acc_arr[j,i])
 					# mask nextacc by possible items then take the lowest value
 					nextacc = np.ma.masked_where(np.logical_not(possible_items),acc_arr[nextij])
 					zz = np.ma.argmin(nextacc,fill_value=1.e10)
@@ -67,8 +103,8 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 					# Merge into the main tributary, only one possible cell
 					zz = np.where(possible_items)[0][0]
 				else:
-					# Merge into the main tributary, 
-					# Need to determine which point in the main stem the tributary should join 
+					# Merge into the main tributary,
+					# Need to determine which point in the main stem the tributary should join
 					zvals = np.where(possible_items)[0]
 					nextacc = acc_arr[nextij][zvals]
 					# If the larger of the next acc values is greater by more than acc0, then chose the greater one
@@ -88,10 +124,24 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 
 			if process_mask[nextj,nexti]:
 				#The downstream cell has already been processed
-				if counter == 1:
-					# Dont include single cells as tributaries
-					dir_arr[j,i] = 0
-					print('single cell tributary, removing')
+				#if counter == 1:
+				#	# Dont include single cells as tributaries
+				#	dir_arr[j,i] = 0
+				#	print('single cell tributary, removing')
+				#if ord_arr[nextj,nexti] == ord_arr[j,i] and acc_arr[j,i] < max_start_acc:
+				#if counter < 10 and acc_arr[j,i] < max_start_acc:
+				# Look 2/3 ahead and check if ord is still the sample
+				dirnext = dir_arr[nextj,nexti]
+				next2j = d8_dirs[dirnext-1][0]+nextj
+				next2i = d8_dirs[dirnext-1][1]+nexti
+				dirnext2 = dir_arr[next2j,next2i]
+				next3j = d8_dirs[dirnext2-1][0]+next2j
+				next3i = d8_dirs[dirnext2-1][1]+next2i
+				if ord_arr[next3j,next3i] == ord_arr[j,i] and acc_arr[j,i] < max_start_acc:
+				# small tributary created by cutting off a loop. Remove this
+					print('Removing tributary which shouldnt be in network')
+					print('Debug: ORD012,ACC',ord_arr[j,i],ord_arr[nextj,nexti],ord_arr[next2j,next2i],acc_arr[j,i])
+					dir_arr = remove_trib(dir_arr,j,i)
 				else:
 					print('reached end of trib: len=',counter)
 				return
@@ -99,8 +149,9 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 				j = nextj
 				i = nexti
 				counter+=1
-		except: # We've probably gone outside the boundary
+		except Exception as e: # We've probably gone outside the boundary
 			print ('error: probably at boundary',nextij)
+			print(e)
 			dir_arr[j,i] = -1
 			return
 
@@ -108,10 +159,10 @@ def trace_down(j,i,acc_arr,ord_arr,process_mask,dir_arr,max_step_acc):
 #########################################################################################
 # Function to loop over tributaries and trace out each one, creating direction maps as we go
 # Inputs are ac_arr (accumulation) and ord_arr (strahler order)
-# 
+#
 def create_directions(acc_arr,ord_arr,max_start_acc=500,max_step_acc = 40):
-	# Use process mask to keep track of river cells we have already traced. 
-	process_mask = ord_arr<=0 
+	# Use process mask to keep track of river cells we have already traced.
+	process_mask = ord_arr<=0
 	dir_arr = np.zeros(ord_arr.shape,dtype=np.int16)
 	# Loop over tributaries, start with smallest accumulations
 	while True:
@@ -121,7 +172,7 @@ def create_directions(acc_arr,ord_arr,max_start_acc=500,max_step_acc = 40):
 		start_ij = np.unravel_index(np.ma.argmin(acc_arr,fill_value = 1.e10),acc_arr.shape)
 		acc_arr.mask = False # Remove mask again...
 		# Only trace tributaries with accumulation less than max_start_acc
-		if acc_arr[start_ij[0],start_ij[1]] < max_start_acc: 
+		if acc_arr[start_ij[0],start_ij[1]] < max_start_acc:
 			print('starting tracedown',start_ij[0],start_ij[1],acc_arr[start_ij[0],start_ij[1]])
 			trace_down(start_ij[0],start_ij[1],acc_arr,ord_arr,process_mask,dir_arr,max_step_acc)
 		else:
@@ -146,27 +197,27 @@ if __name__ == '__main__':
 
 	# count thresh is the minimum number of river cells within each window (otherwise this window is not included in the downsampled river network
 
-	# max_start_acc is the maximum accumulation that will be considered for the upstream point in a tributary. If the most upstream point of the tributary is greater than this it wont be included. 
-	# This is to prevent including cells from the original network being included as separate tributaries, if they are not traced by the algorithm 
+	# max_start_acc is the maximum accumulation that will be considered for the upstream point in a tributary. If the most upstream point of the tributary is greater than this it wont be included.
+	# This is to prevent including cells from the original network being included as separate tributaries, if they are not traced by the algorithm
 	# min acc is 250km^2, so will include tributaries with lowest accumulation from 250 - max_start_acc
 
 	# max_step_acc is the maximum accumulation between cells before we assume that a tributary has merged
 	max_step_acc = 40 # Could potentially increase this to 250?
 
 	# For 30s resolution
-	#nwindow = 10 
-	#count_thresh = 5 # minimum river cells needed within a ( nwindow x nwindow ) block
-	#max_start_acc = 580
+	nwindow = 10
+	count_thresh = 5 # minimum river cells needed within a ( nwindow x nwindow ) block
+	max_start_acc = 580
 
 	# For 9s resolution
 	#nwindow = 3
 	#count_thresh = 2
-	# max_start_acc = 510 # for 9s
+	#max_start_acc = 510 # for 9s
 
 	# For 15s resolution
-	nwindow = 5
-	count_thresh = 3
-	max_start_acc = 550
+	#nwindow = 5
+	#count_thresh = 3
+	#max_start_acc = 550
 
 	#########################################################################################
 	# Set up paths
@@ -233,7 +284,7 @@ if __name__ == '__main__':
 	#########################################################################################
 	# Create  directions array along stream network
 	#
-	if not os.path.exists(f_dir): 
+	if not os.path.exists(f_dir):
 		dir_arr = create_directions(downsample_acc,downsample_ord,max_start_acc=max_start_acc,max_step_acc=max_step_acc)
 
 		# Create outlets array based on directions (use special value of -1 at bottom of river or domain boundary). Setting missing value to 0 allows processing in qgis by 'raster pixels to points'
@@ -246,6 +297,8 @@ if __name__ == '__main__':
 		gdalutils.write_raster(dir_arr, f_dir, geo, 'Int16', -32767)
 
 		# Create network array of points in river network
-		# 
+		#
 		net_arr = dir_arr > 0
 		gdalutils.write_raster(net_arr, f_net, geo, 'Int16', -32767)
+
+	print('Finished!')
