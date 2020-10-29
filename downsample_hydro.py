@@ -4,7 +4,7 @@
 # auth: Peter Uhe
 # mail: peter.uhe@bristol.ac.uk
 
-import os
+import os,argparse
 import gdalutils # From https://github.com/jsosa/gdalutils
 import numpy as np
 from skimage.measure import block_reduce
@@ -193,6 +193,19 @@ if __name__ == '__main__':
 	#########################################################################################
 	# Input parameters for algorithm
 
+	parser = argparse.ArgumentParser(description='Downsample river network to lower horizontal resolution')
+	parser.add_argument('-n','--nwindow',default = '3',type=int,help = 'Number of cells to accumulate into a single pixel')
+	parser.add_argument('-c','--count_thresh',default = '2',type=int,help = 'Minimum river cells needed within a (nwindow x nwindow) block to include')
+	parser.add_argument('-m','--max_start_acc',default = '510',type=int,help = 'Maximum accumulation that will be considered as an upstream point of a tributary.')
+	parser.add_argument('-d','--datadir',help = 'Directory containing river network data (input and output)')
+	args = parser.parse_args()
+
+	nwindow = args.nwindow
+	count_thresh = args.count_thresh
+	max_start_acc = args.max_start_acc
+	datadir = agrs.datadir
+
+
 	# nwindow is block of ( nwindow x nwindow ) cells to aggregate over
 
 	# count thresh is the minimum number of river cells within each window (otherwise this window is not included in the downsampled river network
@@ -202,42 +215,46 @@ if __name__ == '__main__':
 	# min acc is 250km^2, so will include tributaries with lowest accumulation from 250 - max_start_acc
 
 	# max_step_acc is the maximum accumulation between cells before we assume that a tributary has merged
+
 	max_step_acc = 40 # Could potentially increase this to 250?
 
-	# For 30s resolution
-	nwindow = 10
-	count_thresh = 5 # minimum river cells needed within a ( nwindow x nwindow ) block
-	max_start_acc = 580
 
-	# For 9s resolution
-	#nwindow = 3
-	#count_thresh = 2
-	#max_start_acc = 510 # for 9s
+	# Recommended for 9s resolution
+	# nwindow = 3
+	# count_thresh = 2
+	# max_start_acc = 510
 
-	# For 15s resolution
-	#nwindow = 5
-	#count_thresh = 3
-	#max_start_acc = 550
+	# Recommended for 15s resolution
+	# nwindow = 5
+	# count_thresh = 3
+	# max_start_acc = 550
+
+
+	# Recommended for 30s resolution
+	# nwindow = 10
+	# count_thresh = 5
+	# max_start_acc = 580
 
 	#########################################################################################
 	# Set up paths
 
 	# Input files for 3s river network
-	indir = '/home/pu17449/data2/lfp-tools/splitd8_v2/077/'
+	#datadir = '/home/pu17449/data2/lfp-tools/splitd8_v2/077/'
+
 	# Accumulation at each point at the river network, masked for accumulation > 250 km^2
-	acctif = os.path.join(indir,'077_acc.tif')
+	acctif = os.path.join(datadir,'077_acc.tif')
 	# Digital elevation model to downsample (not used to calculate directions)
-	demtif = os.path.join(indir,'077_dem.tif')
+	demtif = os.path.join(datadir,'077_dem.tif')
 	# Strahler order for each point on the river network (calculated by TauDEM)
-	ordtif = os.path.join(indir,'077_ord.tif')
+	ordtif = os.path.join(datadir,'077_ord.tif')
 
 	# Output name assumes that input files are 3s resolution
-	dem_downsample = os.path.join(indir,'dem_downsample_'+str(nwindow*3)+'s.tif')
-	acc_downsample = os.path.join(indir,'acc_downsample_'+str(nwindow*3)+'s.tif')
-	ord_downsample = os.path.join(indir,'ord_downsample_'+str(nwindow*3)+'s.tif')
-	f_dir          = os.path.join(indir,'dir_d8_downsample_'+str(nwindow*3)+'s.tif')
-	f_net          = os.path.join(indir,'net_downsample_'+str(nwindow*3)+'s.tif')
-	f_outlets      = os.path.join(indir,'outlets_downsample_'+str(nwindow*3)+'s.tif')
+	dem_downsample = os.path.join(datadir,'dem_downsample_'+str(nwindow*3)+'s.tif')
+	acc_downsample = os.path.join(datadir,'acc_downsample_'+str(nwindow*3)+'s.tif')
+	ord_downsample = os.path.join(datadir,'ord_downsample_'+str(nwindow*3)+'s.tif')
+	f_dir          = os.path.join(datadir,'dir_d8_downsample_'+str(nwindow*3)+'s.tif')
+	f_net          = os.path.join(datadir,'net_downsample_'+str(nwindow*3)+'s.tif')
+	f_outlets      = os.path.join(datadir,'outlets_downsample_'+str(nwindow*3)+'s.tif')
 
 	#########################################################################################
 	# Get geometry information from acctif, assume all arrays have the same geometry
